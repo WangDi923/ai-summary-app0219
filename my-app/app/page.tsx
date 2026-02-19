@@ -1,67 +1,165 @@
 'use client'
 import { useState } from "react";
 
-// 这个 Home 函数就是一个 Component (组件)
 export default function Home() {
+
+  // ===============================
+  // 状态
+  // ===============================
   const [status, setStatus] = useState("Frontend running");
+  const [uploaded, setUploaded] = useState(false);
 
-  // 原有的 checkBackend 函数
+  // ===============================
+  // 检查 backend
+  // ===============================
   async function checkBackend() {
-    setStatus("Checking backend...");
-    const res = await fetch('/api/health');
-    const data = await res.json();
-    setStatus(`Backend says: ${data.message}`);
+    try {
+      setStatus("Checking backend...");
+
+      const res = await fetch('/api/health');
+      const data = await res.json();
+
+      setStatus(`Backend says: ${data.message}`);
+    } catch (err) {
+      setStatus("Backend connection failed");
+    }
   }
 
-  // 👇 在这里添加新的 uploadFile 函数
+  // ===============================
+  // 上传文件
+  // ===============================
   async function uploadFile(e: any) {
+
     const file = e.target.files[0];
-    if (!file) return; // 如果没选文件就退出
+    if (!file) return;
 
-    setStatus("Uploading...");
-    
-    const formData = new FormData();
-    formData.append('file', file);
+    try {
+      setStatus("Uploading file...");
 
-    const res = await fetch('/api/upload', {
-      method: 'POST',
-      body: formData
-    });
+      const formData = new FormData();
+      formData.append('file', file);
 
-    const data = await res.json();
-    // 如果上传成功，status 会变成 "Upload successful"
-    setStatus(data.message || data.error); 
+      const res = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData
+      });
+
+      const data = await res.json();
+
+      if (data.message) {
+        setUploaded(true);
+      }
+
+      setStatus(data.message || data.error);
+
+    } catch (err) {
+      setStatus("Upload failed");
+    }
   }
 
+  // ===============================
+  // ⭐ DeepSeek 总结上传的文档
+  // ===============================
+  async function summarize() {
+
+    if (!uploaded) {
+      setStatus("Please upload a document first.");
+      return;
+    }
+
+    try {
+      setStatus("DeepSeek AI is reading your document...");
+
+      const res = await fetch('/api/summarize', {
+        method: 'POST'
+      });
+
+      const data = await res.json();
+
+      if (data.summary) {
+        setStatus(data.summary);
+      } else {
+        setStatus(data.error || "AI returned empty result");
+      }
+
+    } catch (err) {
+      setStatus("AI request failed");
+    }
+  }
+
+  // ===============================
+  // UI
+  // ===============================
   return (
-    <div style={{ fontFamily: "system-ui", padding: 24, maxWidth: 800 }}>
-      <h1 style={{ fontSize: '2rem', fontWeight: 'bold', marginBottom: '20px' }}>
-        AI Summary App
+    <div style={{
+      fontFamily: "system-ui",
+      padding: 24,
+      maxWidth: 800,
+      margin: "0 auto"
+    }}>
+
+      <h1 style={{
+        fontSize: '2rem',
+        fontWeight: 'bold'
+      }}>
+        AI Summary App (DeepSeek)
       </h1>
 
-      <div style={{ display: 'flex', gap: '10px', flexDirection: 'column', alignItems: 'flex-start' }}>
-        {/* 之前的测试按钮 */}
+      {/* 按钮区 */}
+      <div style={{
+        display: 'flex',
+        gap: '10px',
+        marginTop: '20px'
+      }}>
+
         <button
           onClick={checkBackend}
-          className="bg-gray-200 text-black px-4 py-2 rounded"
+          className="bg-blue-600 text-white px-4 py-2 rounded"
         >
           Check backend
         </button>
 
-        {/* 👇 新增：上传文件的输入框 */}
-        <div style={{ marginTop: '20px', border: '1px dashed #ccc', padding: '20px', borderRadius: '8px' }}>
-          <p style={{ marginBottom: '10px', fontWeight: 'bold' }}>Step 1: Upload a PDF/Doc</p>
-          <input 
-            type="file" 
-            onChange={uploadFile} 
-            className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
-          />
-        </div>
+        <button
+          onClick={summarize}
+          className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700"
+        >
+          Summarize Uploaded Document
+        </button>
+
       </div>
 
-      <p style={{ marginTop: 24, fontWeight: 'bold', color: '#0070f3' }}>
-        Status: {status}
-      </p>
+      {/* 上传区域 */}
+      <div style={{
+        marginTop: '20px',
+        border: '1px dashed #ccc',
+        padding: '15px',
+        borderRadius: '8px'
+      }}>
+        <p style={{ fontWeight: "bold", marginBottom: 8 }}>
+          Upload PDF / Doc
+        </p>
+
+        <input
+          type="file"
+          onChange={uploadFile}
+        />
+      </div>
+
+      {/* 状态显示 */}
+      <div style={{
+        marginTop: 24,
+        padding: '15px',
+        backgroundColor: '#f4f4f4',
+        borderRadius: '8px',
+        whiteSpace: 'pre-wrap'
+      }}>
+        <p style={{ fontWeight: 'bold' }}>
+          Status / AI Result:
+        </p>
+
+        <p>{status}</p>
+      </div>
+
     </div>
   );
 }
