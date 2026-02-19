@@ -1,40 +1,55 @@
-import { NextResponse } from 'next/server'
+import { NextResponse } from "next/server";
+import fs from "fs";
+import path from "path";
 
-import { supabase } from '@/lib/supabase'
+// ===============================
+// POST /api/upload
+// ===============================
 export async function POST(req: Request) {
+
   try {
-    const formData = await req.formData()
-    const file = formData.get('file') as File
+
+    const formData = await req.formData();
+    const file = formData.get("file") as File;
 
     if (!file) {
-      return NextResponse.json({ error: "No file provided" }, { status: 400 })
+      return NextResponse.json({ error: "No file uploaded" }, { status: 400 });
     }
 
-    // 1. 将文件转换为 ArrayBuffer (在内存中处理)
-    const bytes = await file.arrayBuffer()
-    const buffer = Buffer.from(bytes)
+    // ===============================
+    // 读取文件内容
+    // ===============================
+    const bytes = await file.arrayBuffer();
+    const buffer = Buffer.from(bytes);
 
-    // 2. 直接将内存中的 Buffer 上传到 Supabase
-    // 删掉所有涉及到本地写入（如 fs.writeFile）的代码
-    const { data, error } = await supabase.storage
-      .from('documents')
-      .upload(`uploads/${Date.now()}-${file.name}`, buffer, {
-        contentType: file.type, // 建议加上文件类型
-        upsert: false
-      })
+    const textContent = buffer.toString("utf-8");
 
-    if (error) {
-      console.error('Supabase error:', error.message)
-      return NextResponse.json({ error: error.message }, { status: 500 })
+    // ===============================
+    // 创建 uploads 文件夹（如果不存在）
+    // ===============================
+    const uploadDir = path.join(process.cwd(), "uploads");
+
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir);
     }
+
+    // ===============================
+    // 保存为 document.txt
+    // ===============================
+    const filePath = path.join(uploadDir, "document.txt");
+
+    fs.writeFileSync(filePath, textContent);
 
     return NextResponse.json({
-      message: "Upload successful",
-      path: data.path
-    })
-    
-  } catch (err) {
-    console.error('Server error:', err)
-    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 })
+      message: "Upload successful"
+    });
+
+  } catch (error) {
+
+    console.error("Upload error:", error);
+
+    return NextResponse.json({
+      error: "Upload failed"
+    }, { status: 500 });
   }
 }
