@@ -1,45 +1,26 @@
 import { NextResponse } from "next/server";
-import fs from "fs";
-import path from "path";
+import { supabase } from "@/lib/supabase";
 
 export async function POST() {
   try {
 
     // ===============================
-    // 1️⃣ 找到 uploads 文件夹
+    // 1️⃣ 从 Supabase 读取文件
     // ===============================
-    const uploadDir = path.join(process.cwd(), "uploads");
+    const { data, error } = await supabase.storage
+      .from("documents")
+      .download("document.txt");
 
-    if (!fs.existsSync(uploadDir)) {
+    if (error || !data) {
       return NextResponse.json(
-        { error: "Uploads folder not found." },
+        { error: "No uploaded document found." },
         { status: 400 }
       );
     }
 
-    // ===============================
-    // 2️⃣ 获取最新上传文件
-    // ===============================
-    const files = fs.readdirSync(uploadDir);
+    const fullText = await data.text();
 
-    if (files.length === 0) {
-      return NextResponse.json(
-        { error: "No uploaded document found. Please upload a file first." },
-        { status: 400 }
-      );
-    }
-
-    // 取最后上传的文件
-    const latestFile = files[files.length - 1];
-    const filePath = path.join(uploadDir, latestFile);
-
-    // ===============================
-    // 3️⃣ 读取文件内容
-    // ===============================
-    const fullText = fs.readFileSync(filePath, "utf-8");
-
-    // ⭐⭐⭐ 关键修复：限制文本长度 ⭐⭐⭐
-    // DeepSeek token 上限限制，必须截断
+    // 限制长度（防 token 爆炸）
     const MAX_CHARS = 12000;
 
     const documentText =
@@ -48,7 +29,7 @@ export async function POST() {
         : fullText;
 
     // ===============================
-    // 4️⃣ 调用 DeepSeek API
+    // 2️⃣ 调用 DeepSeek
     // ===============================
     const response = await fetch(
       "https://api.deepseek.com/v1/chat/completions",
@@ -68,18 +49,7 @@ export async function POST() {
             },
             {
               role: "user",
-              content: `
-Please summarize the uploaded document.
-
-Requirements:
-- Clear explanation
-- Bullet points
-- Easy for students to understand
-- Focus on key ideas only
-
-Document:
-${documentText}
-              `,
+              content: `Summarize this document:\n\n${documentText}`,
             },
           ],
           temperature: 0.3,
@@ -87,28 +57,18 @@ ${documentText}
       }
     );
 
-    // ===============================
-    // 5️⃣ API 错误检查（非常重要）
-    // ===============================
     const text = await response.text();
 
     if (!response.ok) {
-      console.error("DeepSeek API ERROR:");
       console.error(text);
-
-      return NextResponse.json(
-        { error: "DeepSeek API request failed." },
-        { status: 500 }
-      );
+      throw new Error("DeepSeek API failed");
     }
 
-    const data = JSON.parse(text);
+    const json = JSON.parse(text);
 
-    // ===============================
-    // 6️⃣ 返回 summary
-    // ===============================
     const summary =
-      data.choices?.[0]?.message?.content || "No summary generated.";
+      json.choices?.[0]?.message?.content ??
+      "No summary generated.";
 
     return NextResponse.json({ summary });
 
@@ -116,7 +76,7 @@ ${documentText}
     console.error("Summarize error:", error);
 
     return NextResponse.json(
-      { error: "Internal server error." },
+      { error: "Internal server error" },
       { status: 500 }
     );
   }

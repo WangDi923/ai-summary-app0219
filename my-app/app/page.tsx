@@ -1,3 +1,4 @@
+
 'use client'
 import { useState } from "react";
 
@@ -7,7 +8,6 @@ export default function Home() {
   // 状态
   // ===============================
   const [status, setStatus] = useState("Frontend running");
-  const [uploaded, setUploaded] = useState(false);
 
   // ===============================
   // 检查 backend
@@ -46,10 +46,6 @@ export default function Home() {
 
       const data = await res.json();
 
-      if (data.message) {
-        setUploaded(true);
-      }
-
       setStatus(data.message || data.error);
 
     } catch (err) {
@@ -58,20 +54,22 @@ export default function Home() {
   }
 
   // ===============================
-  // ⭐ DeepSeek 总结上传的文档
+  // ⭐ DeepSeek AI Summary
   // ===============================
   async function summarize() {
 
-    if (!uploaded) {
-      setStatus("Please upload a document first.");
-      return;
-    }
-
     try {
-      setStatus("DeepSeek AI is reading your document...");
+      setStatus("DeepSeek AI is thinking...");
 
       const res = await fetch('/api/summarize', {
-        method: 'POST'
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          text:
+            "Next.js is a powerful React framework that enables server-side rendering, static generation, and full-stack development. It helps developers build fast and scalable web applications."
+        })
       });
 
       const data = await res.json();
@@ -123,7 +121,7 @@ export default function Home() {
           onClick={summarize}
           className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700"
         >
-          Summarize Uploaded Document
+          Summarize (DeepSeek)
         </button>
 
       </div>
